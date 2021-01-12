@@ -5530,10 +5530,11 @@ int smblib_set_prop_thermal_overheat(struct smb_charger *chg,
 
 irqreturn_t default_irq_handler(int irq, void *data)
 {
-	struct smb_irq_data *irq_data = data;
-	struct smb_charger *chg = irq_data->parent_data;
-
-	smblib_dbg(chg, PR_INTERRUPT, "IRQ: %s\n", irq_data->name);
+#if IS_ENABLED(CONFIG_GOOGLE_LOGBUFFER)
+  struct smb_irq_data *irq_data = data;
+  struct smb_charger *chg = irq_data->parent_data;
+  smblib_dbg(chg, PR_INTERRUPT, "IRQ: %s\n", irq_data->name);
+#endif
 	return IRQ_HANDLED;
 }
 
