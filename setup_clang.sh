@@ -7,7 +7,7 @@
 #
 
 # Path to executables in Clang toolchain
-clang_bin="$HOME/toolchains/proton-clang/bin"
+clang_bin="$(pwd)/cloned-clang/bin"
 
 # 64-bit GCC toolchain prefix
 gcc_prefix64="aarch64-linux-gnu-"
