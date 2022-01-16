@@ -1,0 +1,13 @@
+
+kind: pipeline
+name: Kernel Build
+
+clone:
+  depth: 1
+
+steps:
+ - name: Compile kernel
+   image: proxer05/ubuntu-droid-builder:latest
+   commands:
+      - cd /drone/src
+      - sudo bash compile.sh
