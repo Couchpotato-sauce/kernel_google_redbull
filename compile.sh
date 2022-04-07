@@ -1,11 +1,11 @@
 #!/bin/sh
 
 # Clone clang from defined repo
-git clone --depth=1 https://gitlab.com/Panchajanya1999/azure-clang cloned-clang
+git clone --depth=1 https://gitlab.com/klozz/yuki-clang-new cloned-clang
 
 # Clone arter97's arm64-gcc and arm32-gcc repo's
-git clone --depth=1 https://github.com/arter97/arm64-gcc arm64-gcc
-git clone --depth=1 https://github.com/arter97/arm32-gcc arm32-gcc
+git clone --depth=1 https://github.com/mvaisakh/gcc-arm64 arm64-gcc
+git clone --depth=1 https://github.com/mvaisakh/gcc-arm arm32-gcc
 
 # Clone Kramflash
 git clone --depth=1 https://github.com/Couchpotato-sauce/kramflash kramflash
