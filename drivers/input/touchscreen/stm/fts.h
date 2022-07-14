@@ -54,9 +54,8 @@
   */
 /* **** CODE CONFIGURATION **** */
 #define FTS_TS_DRV_NAME		"fts"	/* driver name */
-#define FTS_TS_DRV_VERSION	"5.2.16.14"	/* driver version string
-							 * */
-#define FTS_TS_DRV_VER		0x0502100E	/* driver version u32 format */
+#define FTS_TS_DRV_VERSION	"5.2.16.15"	/* driver version string */
+#define FTS_TS_DRV_VER		0x0502100F	/* driver version u32 format */
 
 /* #define DEBUG */	/* /< define to print more logs in the kernel log
 			 * and better follow the code flow */
@@ -292,6 +291,7 @@ struct fts_hw_platform_data {
 	int x_axis_max;
 	int y_axis_max;
 	bool auto_fw_update;
+	bool separate_save_golden_ms_raw_cmd;
 #if IS_ENABLED(CONFIG_TOUCHSCREEN_HEATMAP)
 	bool heatmap_mode_full_init;
 #endif
@@ -299,6 +299,7 @@ struct fts_hw_platform_data {
 	u32 initial_panel_index;
 	u32 *force_pi_cfg_ver;
 	u32 offload_id;
+	u8 fw_grip_area;
 };
 
 /* Bits for the bus reference mask */
@@ -410,8 +411,12 @@ struct fts_ts_info {
 
 	struct completion bus_resumed;		/* resume_work complete */
 
+<<<<<<< HEAD
 	struct pm_qos_request pm_spi_req;
 	struct pm_qos_request pm_touch_req;
+=======
+	struct pm_qos_request pm_qos_req;
+>>>>>>> a43c04864f7693c3dd9849330fc4d388820270be
 #if IS_ENABLED(CONFIG_TOUCHSCREEN_HEATMAP)
 	struct v4l2_heatmap v4l2;
 #endif
