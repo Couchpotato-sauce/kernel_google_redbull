@@ -17,6 +17,7 @@
 #ifndef __GOOGLE_BMS_H_
 #define __GOOGLE_BMS_H_
 
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/power_supply.h>
 #include "qmath.h"
@@ -26,6 +27,8 @@ struct device_node;
 
 #define GBMS_CHG_TEMP_NB_LIMITS_MAX 10
 #define GBMS_CHG_VOLT_NB_LIMITS_MAX 6
+#define GBMS_CHG_ALG_BUF 500
+#define GBMS_AACR_DATA_MAX 10
 
 struct gbms_chg_profile {
 	const char *owner_name;
@@ -54,6 +57,11 @@ struct gbms_chg_profile {
 	u32 fv_uv_resolution;
 	/* experimental */
 	u32 cv_otv_margin;
+
+	/* AACR feature */
+	u32 reference_cycles[GBMS_AACR_DATA_MAX];
+	u32 reference_fade10[GBMS_AACR_DATA_MAX];
+	u32 aacr_nb_limits;
 };
 
 #define WLC_BPP_THRESHOLD_UV	700000
@@ -242,6 +250,7 @@ enum chg_health_state {
 
 /* tier index used to log the session */
 enum gbms_stats_tier_idx_t {
+	GBMS_STATS_AC_TI_DISABLE_DIALOG = -6,
 	GBMS_STATS_AC_TI_DEFENDER = -5,
 	GBMS_STATS_AC_TI_DISABLE_SETTING_STOP = -4,
 	GBMS_STATS_AC_TI_DISABLE_MISC = -3,
@@ -250,13 +259,15 @@ enum gbms_stats_tier_idx_t {
 
 	/* Regular charge tiers 0 -> 9 */
 	GBMS_STATS_AC_TI_VALID = 10,
-	GBMS_STATS_AC_TI_DISABLED,
-	GBMS_STATS_AC_TI_ENABLED,
-	GBMS_STATS_AC_TI_ACTIVE,
-	GBMS_STATS_AC_TI_ENABLED_AON,
-	GBMS_STATS_AC_TI_ACTIVE_AON,
-	GBMS_STATS_AC_TI_PAUSE,
-	GBMS_STATS_AC_TI_PAUSE_AON,
+	GBMS_STATS_AC_TI_DISABLED = 11,
+	GBMS_STATS_AC_TI_ENABLED = 12,
+	GBMS_STATS_AC_TI_ACTIVE = 13,
+	GBMS_STATS_AC_TI_ENABLED_AON = 14,
+	GBMS_STATS_AC_TI_ACTIVE_AON = 15,
+	GBMS_STATS_AC_TI_PAUSE = 16,
+	GBMS_STATS_AC_TI_PAUSE_AON = 17,
+	GBMS_STATS_AC_TI_V2_PREDICT = 18,
+	GBMS_STATS_AC_TI_V2_PREDICT_SUCCESS = 19,
 
 	/* TODO: rename, these are not really related to AC */
 	GBMS_STATS_AC_TI_FULL_CHARGE = 100,
@@ -265,6 +276,9 @@ enum gbms_stats_tier_idx_t {
 	/* Defender TEMP or DWELL */
 	GBMS_STATS_BD_TI_OVERHEAT_TEMP = 110,
 	GBMS_STATS_BD_TI_CUSTOM_LEVELS = 111,
+	GBMS_STATS_BD_TI_TRICKLE = 112,
+
+	GBMS_STATS_BD_TI_TRICKLE_CLEARED = 122,
 };
 
 /* health state */
@@ -274,11 +288,13 @@ struct batt_chg_health {
 	int always_on_soc;	/* entry criteria */
 
 	time_t rest_deadline;	/* full by this in seconds */
+	time_t dry_run_deadline; /* full by this in seconds (prediction) */
 	int rest_rate;		/* centirate once enter */
 
 	enum chg_health_state rest_state;
 	int rest_cc_max;
 	int rest_fv_uv;
+	ktime_t active_time;
 };
 
 #define CHG_HEALTH_REST_IS_ACTIVE(rest) \
@@ -306,14 +322,15 @@ struct gbms_charging_event {
 
 	time_t first_update;
 	time_t last_update;
-	uint32_t chg_sts_qual_time;
-	uint32_t chg_sts_delta_soc;
+	bool bd_clear_trickle;
 
 	/* health based charging */
 	struct batt_chg_health		ce_health;	/* updated on close */
 	struct gbms_ce_tier_stats	health_stats;	/* updated in HC */
 	/* updated in HCP */
 	struct gbms_ce_tier_stats	health_pause_stats;
+	/* updated on sysfs */
+	struct gbms_ce_tier_stats health_dryrun_stats;
 
 	/* other stats */
 	struct gbms_ce_tier_stats full_charge_stats;
@@ -321,6 +338,7 @@ struct gbms_charging_event {
 
 	struct gbms_ce_tier_stats overheat_stats;
 	struct gbms_ce_tier_stats cc_lvl_stats;
+	struct gbms_ce_tier_stats trickle_stats;
 };
 
 #define GBMS_CCCM_LIMITS(profile, ti, vi) \
@@ -351,12 +369,15 @@ int gbms_init_chg_profile_internal(struct gbms_chg_profile *profile,
 #define gbms_init_chg_profile(p, n) \
 	gbms_init_chg_profile_internal(p, n, KBUILD_MODNAME)
 
-void gbms_init_chg_table(struct gbms_chg_profile *profile, u32 capacity);
+void gbms_init_chg_table(struct gbms_chg_profile *profile,
+			 struct device_node *node, u32 capacity);
 
 void gbms_free_chg_profile(struct gbms_chg_profile *profile);
 
-void gbms_dump_raw_profile(const struct gbms_chg_profile *profile, int scale);
-#define gbms_dump_chg_profile(profile) gbms_dump_raw_profile(profile, 1000)
+void gbms_dump_raw_profile(char *buff, size_t len,
+			   const struct gbms_chg_profile *profile, int scale);
+#define gbms_dump_chg_profile(buff, len, profile) \
+	gbms_dump_raw_profile(buff, len, profile, 1000)
 
 /* newgen charging: charge profile */
 int gbms_msc_temp_idx(const struct gbms_chg_profile *profile, int temp);
@@ -368,7 +389,11 @@ int gbms_msc_round_fv_uv(const struct gbms_chg_profile *profile,
 uint8_t gbms_gen_chg_flags(int chg_status, int chg_type);
 /* newgen charging: read/gen charger state  */
 int gbms_read_charger_state(union gbms_charger_state *chg_state,
-			    struct power_supply *chg_psy);
+			    struct power_supply *chg_psy,
+			    struct power_supply *wlc_psy);
+
+/* calculate aacr reference capacity */
+int gbms_aacr_fade10(const struct gbms_chg_profile *profile, int cycles);
 
 /* debug/print */
 const char *gbms_chg_type_s(int chg_type);

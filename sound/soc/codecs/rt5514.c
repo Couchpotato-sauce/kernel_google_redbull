@@ -228,7 +228,16 @@ static void rt5514_enable_dsp_prepare(struct rt5514_priv *rt5514)
 static ssize_t i2c_reset_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
-	return sysfs_emit(buf, "%d\n", g_rt5514->pdata.i2c_reset);
+	ssize_t ret;
+
+	if (g_rt5514->pdata.i2c_reset)
+		ret = scnprintf(buf, RT5514_ENTRY_MAX_LEN, "%u\n",
+			 (unsigned int)true);
+	else
+		ret = scnprintf(buf, RT5514_ENTRY_MAX_LEN, "%u\n",
+			 (unsigned int)false);
+
+	return ret;
 }
 
 static DEVICE_ATTR_RO(i2c_reset);
@@ -1499,8 +1508,15 @@ static int rt5514_mem_test_get(struct snd_kcontrol *kcontrol,
 		return 0;
 	}
 
-	regmap_multi_reg_write(rt5514->i2c_regmap,
-		rt5514_i2c_patch, rt5514->i2c_patch_size);
+	if (rt5514->gpiod_reset) {
+		gpiod_set_value(rt5514->gpiod_reset, 0);
+		usleep_range(1000, 2000);
+		gpiod_set_value(rt5514->gpiod_reset, 1);
+	} else {
+		regmap_multi_reg_write(rt5514->i2c_regmap,
+			rt5514_i2c_patch, rt5514->i2c_patch_size);
+	}
+
 	rt5514_enable_dsp_prepare(rt5514);
 
 	buf1 = kmalloc(0xb8000, GFP_KERNEL);
@@ -1550,8 +1566,15 @@ static int rt5514_mem_test_get(struct snd_kcontrol *kcontrol,
 	dev_info(component->dev, "Test done\n");
 
 failed:
-	regmap_multi_reg_write(rt5514->i2c_regmap,
-		rt5514_i2c_patch, rt5514->i2c_patch_size);
+	if (rt5514->gpiod_reset) {
+		gpiod_set_value(rt5514->gpiod_reset, 0);
+		usleep_range(1000, 2000);
+		gpiod_set_value(rt5514->gpiod_reset, 1);
+	} else {
+		regmap_multi_reg_write(rt5514->i2c_regmap,
+			rt5514_i2c_patch, rt5514->i2c_patch_size);
+	}
+
 	rt5514_dsp_enable(rt5514, false, true);
 	rt5514_spi_request_switch(SPI_SWITCH_MASK_CMD, 0);
 	ucontrol->value.integer.value[0] = !!ret;
