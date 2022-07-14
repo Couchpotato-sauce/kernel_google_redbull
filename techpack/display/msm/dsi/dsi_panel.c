@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -2019,7 +2019,7 @@ static int dsi_panel_create_cmd_packets(const char *data,
 		cmd[i].msg.type = data[0];
 		cmd[i].last_command = (data[1] == 1);
 		cmd[i].msg.channel = data[2];
-		cmd[i].msg.flags |= (data[3] == 1 ? MIPI_DSI_MSG_REQ_ACK : 0);
+		cmd[i].msg.flags |= data[3];
 		cmd[i].msg.ctrl = 0;
 		cmd[i].post_wait_ms = cmd[i].msg.wait_ms = data[4];
 		cmd[i].msg.tx_len = ((data[5] << 8) | (data[6]));
@@ -4016,6 +4016,7 @@ void dsi_panel_debugfs_init(struct dsi_panel *panel, struct dentry *dir)
 
 	dsi_panel_debugfs_create_cmdsets_from_list(dir, panel);
 	dsi_panel_bl_debugfs_init(dir, panel);
+	dsi_panel_bl_elvss_debugfs_init(dir, panel);
 
 	return;
 
@@ -4574,12 +4575,17 @@ int dsi_panel_update_pps(struct dsi_panel *panel)
 
 	set = &priv_info->cmd_sets[DSI_CMD_SET_PPS];
 
-	dsi_dsc_create_pps_buf_cmd(&priv_info->dsc, panel->dsc_pps_cmd, 0);
-	rc = dsi_panel_create_cmd_packets(panel->dsc_pps_cmd,
-					  DSI_CMD_PPS_SIZE, 1, set->cmds);
-	if (rc) {
-		DSI_ERR("failed to create cmd packets, rc=%d\n", rc);
-		goto error;
+	if (!priv_info->pps_created) {
+		dsi_dsc_create_pps_buf_cmd(&priv_info->dsc, panel->dsc_pps_cmd, 0);
+		rc = dsi_panel_create_cmd_packets(panel->dsc_pps_cmd,
+						DSI_CMD_PPS_SIZE, 1, set->cmds);
+		if (rc) {
+			DSI_ERR("failed to create cmd packets, rc=%d\n", rc);
+			goto error;
+		}
+		else {
+			priv_info->pps_created = true;
+		}
 	}
 
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_PPS);
@@ -4588,7 +4594,6 @@ int dsi_panel_update_pps(struct dsi_panel *panel)
 			panel->name, rc);
 	}
 
-	dsi_panel_destroy_cmd_packets(set);
 error:
 	mutex_unlock(&panel->panel_lock);
 	return rc;
