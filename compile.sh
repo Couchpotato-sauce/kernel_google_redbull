@@ -1,17 +1,18 @@
 #!/bin/sh
 
 # Clone clang from defined repo
-git clone --depth=1 https://gitlab.com/Panchajanya1999/azure-clang cloned-clang
+curl -sL https://raw.githubusercontent.com/XSans0/WeebX-Clang/main/main/link.txt | xargs wget -O weebx-clang.tar.gz && \
+mkdir clang && tar -xf weebx-clang.tar.gz -C clang && rm -rf weebx-clang.tar.gz
 
-# Clone arter97's arm64-gcc and arm32-gcc repo's
-git clone --depth=1 https://github.com/arter97/arm64-gcc arm64-gcc
-git clone --depth=1 https://github.com/arter97/arm32-gcc arm32-gcc
+# Clone mvaisakh's arm64-gcc and arm32-gcc repo's
+git clone --depth=1 https://github.com/mvaisakh/gcc-arm64 arm64-gcc
+git clone --depth=1 https://github.com/mvaisakh/gcc-arm arm32-gcc
 
 # Clone Kramflash
 git clone --depth=1 https://github.com/Couchpotato-sauce/kramflash kramflash
 
 # Export the PATH variable
-export PATH="$(pwd)/cloned-clang/bin:/$(pwd)/arm32-gcc/bin:$(pwd)/arm64-gcc/bin:${PATH}"
+export PATH="$(pwd)/clang/bin:/$(pwd)/arm32-gcc/bin:$(pwd)/arm64-gcc/bin:${PATH}"
 
 # Clean up out
 find out -delete
@@ -35,7 +36,7 @@ cp dtb kramflash/rd/payload/dtb
 cp out/arch/arm64/boot/Image.lz4 kramflash/rd/payload/Image.lz4
 
 # Install pigz as its required to pack the image
-# apt install -y pigz
+apt install -y pigz
 
 cd kramflash
 
