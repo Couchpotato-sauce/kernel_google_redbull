@@ -7,7 +7,7 @@ clone:
 
 steps:
  - name: Compile kernel
-   image: proxer05/ubuntu-droid-builder:latest
+   image: fr3akyphantom/droid-builder-beta
    commands:
       - cd /drone/src
       - sudo bash compile.sh
